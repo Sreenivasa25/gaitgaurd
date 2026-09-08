@@ -1,5 +1,29 @@
-# GaitGuard MacBook Demo
+# GaitGuard — macbook-demo
 
-This branch contains a minimal demo scaffold to run a MacBook camera demo using MediaPipe Pose, an online baseline (running mean/cov with gating), a simple tracker, and a trend scorer. It is intended as an end-to-end prototype for local testing; do NOT enable raw-frame persistence by default.
+Quickstart (macOS)
 
-See src/demos/demo_camera.py for the runnable entrypoint.
+1. Clone and checkout demo branch:
+   git fetch origin
+   git checkout macbook-demo
+
+2. Create & activate venv:
+   python3 -m venv .venv
+   source .venv/bin/activate
+
+3. Install deps:
+   pip install -r requirements.txt
+   pip install certifi  # ensures mediapipe model download works on macOS
+
+4. Ensure directories exist and create .env if needed:
+   mkdir -p notebooks docs logs
+   cp .env.example .env
+
+5. Run the demo:
+   # add src to PYTHONPATH or run demo directly (demo already auto-adds src to sys.path)
+   python src/demos/demo_camera.py --fps 5
+
+Notes:
+- The demo uses MediaPipe Pose. On first run mediapipe downloads its TFLite model (requires internet).
+- The baseline uses a warm-up of 10 embeddings per worker before scoring begins.
+- The demo buffers timeseries rows and flushes to SQLite every 10s to avoid frequent DB writes.
+- To quit the demo window press `q`.

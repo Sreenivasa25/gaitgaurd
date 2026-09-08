@@ -3,8 +3,9 @@
 Returns detections as a list of dicts:
   {"keypoints": np.ndarray of shape (N,3) [x,y,score], "bbox": (x,y,w,h), "score": float}
 """
-
+#!/usr/bin/env python3
 import os
+# ensure Python's SSL uses certifi CA bundle if available (fixes macOS SSL cert issues)
 try:
     import certifi
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
@@ -18,6 +19,7 @@ try:
     import mediapipe as mp
 except Exception:
     mp = None
+
 
 
 class PoseModel:
