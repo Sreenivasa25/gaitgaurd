@@ -1,1 +1,5 @@
-hi
+# GaitGuard MacBook Demo
+
+This branch contains a minimal demo scaffold to run a MacBook camera demo using MediaPipe Pose, an online baseline (running mean/cov with gating), a simple tracker, and a trend scorer. It is intended as an end-to-end prototype for local testing; do NOT enable raw-frame persistence by default.
+
+See src/demos/demo_camera.py for the runnable entrypoint.
