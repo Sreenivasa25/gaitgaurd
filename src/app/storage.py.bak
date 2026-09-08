@@ -4,7 +4,7 @@ Stores baseline serialized dicts in a table; stores recent deviation time-series
 """
 import sqlite3
 import json
-from typing import Optional, List, Tuple
+from typing import Optional
 
 
 class Storage:
@@ -17,8 +17,6 @@ class Storage:
         cur = self.conn.cursor()
         cur.execute("""CREATE TABLE IF NOT EXISTS baselines (worker_id INTEGER PRIMARY KEY, json TEXT)""")
         cur.execute("""CREATE TABLE IF NOT EXISTS series (worker_id INTEGER, timestamp REAL, deviation REAL)""")
-        # index to speed up queries and pruning
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_series_worker_ts ON series (worker_id, timestamp)")
         self.conn.commit()
 
     def save_baseline(self, worker_id: int, data: dict):
@@ -38,24 +36,6 @@ class Storage:
     def append_series(self, worker_id: int, timestamp: float, deviation: float):
         cur = self.conn.cursor()
         cur.execute("INSERT INTO series (worker_id, timestamp, deviation) VALUES (?,?,?)", (worker_id, float(timestamp), float(deviation)))
-        self.conn.commit()
-
-    def append_series_batch(self, rows: List[Tuple[int, float, float]]):
-        """Insert multiple (worker_id, timestamp, deviation) rows in a single transaction."""
-        if not rows:
-            return
-        cur = self.conn.cursor()
-        try:
-            cur.executemany("INSERT INTO series (worker_id, timestamp, deviation) VALUES (?,?,?)", [(int(r[0]), float(r[1]), float(r[2])) for r in rows])
-            self.conn.commit()
-        except Exception:
-            self.conn.rollback()
-            raise
-
-    def prune_series_older_than(self, cutoff_ts: float):
-        """Delete series older than cutoff_ts (unix timestamp)."""
-        cur = self.conn.cursor()
-        cur.execute("DELETE FROM series WHERE timestamp < ?", (float(cutoff_ts),))
         self.conn.commit()
 
     def close(self):

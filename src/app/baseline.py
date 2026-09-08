@@ -75,7 +75,7 @@ class RunningMeanCov:
 
 
 class BaselineStore:
-    def __init__(self, dim: int, alpha: float = 0.001, gate_threshold: float = 3.0, warmup_n: int = 0):
+    def __init__(self, dim: int, alpha: float = 0.001, gate_threshold: float = 3.0, warmup_n: int = 10):
         """
         dim: embedding dimension
         warmup_n: number of embeddings to collect per worker before initializing baseline.

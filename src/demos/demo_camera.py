@@ -7,15 +7,16 @@ Run: python src/demos/demo_camera.py
 """
 import os
 import sys
-# make sure `src` (one level up) is on sys.path so `from app...` imports work
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import time
 import argparse
 import math
+import signal
 import cv2
 import numpy as np
 from collections import defaultdict, deque
+
+# Ensure src/ is importable
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.pose_backbone import PoseModel
 from app.tracker import Tracker
@@ -24,17 +25,28 @@ from app.baseline import BaselineStore
 from app.trend import TrendScorer
 from app.storage import Storage
 
+# graceful shutdown flag
+STOP_REQUESTED = False
+def _on_signal(sig, frame):
+    global STOP_REQUESTED
+    STOP_REQUESTED = True
+
+signal.signal(signal.SIGINT, _on_signal)
+signal.signal(signal.SIGTERM, _on_signal)
+
+
 def main(args):
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Failed to open camera")
         return
     model = PoseModel(model_complexity=0, min_detection_confidence=0.5)
-    tracker = Tracker(max_distance=0.15, max_misses=15)  # fraction of diag or pixel value if >1.0
+    tracker = Tracker(max_distance=0.15, max_misses=15)  # fraction of diag or pixels if >1.0
     # embedding dim: features.embedding -> mean+std ->  (len(USE_INDICES)*2)*2
     from app.features import USE_INDICES
     emb_dim = len(USE_INDICES) * 4
-    baseline = BaselineStore(dim=emb_dim, alpha=0.005, gate_threshold=4.0, warmup_n=0)
+    # warmup_n=10 collects 10 embeddings before baseline initialization
+    baseline = BaselineStore(dim=emb_dim, alpha=0.005, gate_threshold=4.0, warmup_n=10)
     trend = TrendScorer(window_size=240, ewma_alpha=0.2)
     storage = Storage(path=args.sqlite)
 
@@ -46,11 +58,15 @@ def main(args):
     last_flush = time.time()
     flush_interval = 10.0  # seconds
     last_baseline_save = time.time()
-    baseline_save_interval = 30.0  # seconds
+    baseline_save_interval = 60.0  # seconds
 
     try:
         frame_interval = 1.0 / float(args.fps)
         while True:
+            if STOP_REQUESTED:
+                print("Shutdown requested, exiting main loop...")
+                break
+
             t0 = time.time()
             ret, frame = cap.read()
             if not ret:
@@ -104,13 +120,18 @@ def main(args):
 
             cv2.imshow('gaitguard-demo', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
+                print("Quit key pressed.")
                 break
 
             # periodically flush pending series and save baselines
             now = time.time()
             if now - last_flush > flush_interval and pending_series:
-                for (wid, tstamp, val) in pending_series:
-                    storage.append_series(wid, tstamp, val)
+                try:
+                    storage.append_series_batch(pending_series)
+                except AttributeError:
+                    # fallback: append one-by-one if batch API not available
+                    for (wid, tstamp, val) in pending_series:
+                        storage.append_series(wid, tstamp, val)
                 pending_series.clear()
                 last_flush = now
 
@@ -128,8 +149,13 @@ def main(args):
                 time.sleep(to_sleep)
     finally:
         # flush any pending series and save baselines on shutdown
-        for (wid, tstamp, val) in pending_series:
-            storage.append_series(wid, tstamp, val)
+        if pending_series:
+            try:
+                storage.append_series_batch(pending_series)
+            except AttributeError:
+                for (wid, tstamp, val) in pending_series:
+                    storage.append_series(wid, tstamp, val)
+
         serial = baseline.serialize()
         for k, v in serial.items():
             storage.save_baseline(int(k), v)
@@ -138,6 +164,7 @@ def main(args):
         storage.close()
         cap.release()
         cv2.destroyAllWindows()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
