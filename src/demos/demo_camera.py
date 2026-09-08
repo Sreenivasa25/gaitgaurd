@@ -75,10 +75,9 @@ def main(args):
 
                 # Check baseline score (None means warm-up/uninitialized)
                 score = baseline.score(tid)
-                if score is None:
-                    # feed the warmup buffer; BaselineStore will initialize when ready
+                if score is None or score == float('inf'):
+                    # baseline not ready: feed the warmup buffer; BaselineStore will initialize when ready
                     baseline.update(tid, emb)
-                    # do not add to trend or persist until baseline initializes
                     status_text = "warmup"
                     display_score = 0.0
                 else:
@@ -88,6 +87,7 @@ def main(args):
                     display_score = float(score) if score != float('inf') else 0.0
                     trend.add_sample(tid, ts, display_score)
                     status_text = f"{display_score:.3f}"
+                    pending_series.append((tid, ts, display_score))
 
                     # buffer series row for batched flush
                     pending_series.append((tid, ts, display_score))
