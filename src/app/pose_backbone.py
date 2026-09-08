@@ -4,6 +4,13 @@ Returns detections as a list of dicts:
   {"keypoints": np.ndarray of shape (N,3) [x,y,score], "bbox": (x,y,w,h), "score": float}
 """
 
+import os
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+except Exception:
+    pass
+
 from typing import List, Dict, Tuple
 import numpy as np
 
